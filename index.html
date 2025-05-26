@@ -294,7 +294,13 @@
                     scales: {
                         x: {
                             type: 'time',
-                            time: { unit: 'month', tooltipFormat: 'MMM finalList', displayFormats: { month: 'MMM finalList' } },
+                            time: {
+                                unit: 'month',
+                                tooltipFormat: 'MMM yyyy', // UPDATED: Format for tooltip (Month Year)
+                                displayFormats: {
+                                    month: 'MMM yyyy' // UPDATED: Format for axis labels (Month Year)
+                                }
+                            },
                             title: { display: true, text: 'Payment Date' }
                         },
                         y: {
