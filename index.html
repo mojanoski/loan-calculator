@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loan Amortization Schedule</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+     <script src="https://cdn.jsdelivr.net/npm/luxon@^2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@^1"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         /* Use Inter font */
@@ -12,35 +15,25 @@
             font-family: 'Inter', sans-serif;
             background-color: #f3f4f6; /* Light gray background */
         }
-        /* Style for the table container to make it scrollable on smaller screens */
+        /* Style for the table container */
         .table-container {
-            max-height: 400px; /* Adjust height as needed */
+            max-height: 500px; /* Increased height slightly for totals */
             overflow-y: auto;
-            margin-bottom: 1rem; /* Add some space below the table */
+            margin-bottom: 1rem;
         }
-        /* Custom scrollbar for better aesthetics (optional) */
-        .table-container::-webkit-scrollbar {
-            width: 8px;
-        }
-        .table-container::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
-        }
-        .table-container::-webkit-scrollbar-thumb {
-            background: #a0aec0; /* Tailwind gray-500 */
-            border-radius: 10px;
-        }
-        .table-container::-webkit-scrollbar-thumb:hover {
-            background: #718096; /* Tailwind gray-600 */
-        }
-        /* Ensure sticky header for the table */
+        /* Custom scrollbar */
+        .table-container::-webkit-scrollbar { width: 8px; }
+        .table-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        .table-container::-webkit-scrollbar-thumb { background: #a0aec0; border-radius: 10px; }
+        .table-container::-webkit-scrollbar-thumb:hover { background: #718096; }
+        /* Sticky table header */
         thead th {
             position: sticky;
             top: 0;
             background-color: #e2e8f0; /* Tailwind gray-200 */
             z-index: 10;
         }
-         /* Style for the message box */
+         /* Message box style */
         .message-box {
             position: fixed;
             top: 20px;
@@ -48,80 +41,80 @@
             transform: translateX(-50%);
             padding: 1rem 1.5rem;
             border-radius: 0.5rem;
-            background-color: #fecaca; /* Tailwind red-200 */
-            color: #991b1b; /* Tailwind red-800 */
-            border: 1px solid #f87171; /* Tailwind red-400 */
+            background-color: #fecaca;
+            color: #991b1b;
+            border: 1px solid #f87171;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             z-index: 1000;
-            display: none; /* Hidden by default */
+            display: none;
             font-weight: 500;
-            transition: opacity 0.5s ease-out; /* Add transition for fade out */
+            transition: opacity 0.5s ease-out;
         }
+        /* Chart container styles */
+        .chart-container {
+            margin: 1rem auto; /* Center the chart containers */
+            padding: 1rem;
+            background-color: #fff; /* White background for chart area */
+            border-radius: 0.5rem; /* Rounded corners */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Subtle shadow */
+        }
+        /* REMOVED Pie Chart Container Style */
+        #lineChartContainer {
+             max-width: 100%; /* Allow line chart to use more width */
+             margin-top: 1.5rem; /* Add space above line chart */
+        }
+        /* Styles for summary rows */
+        .year-total-row td {
+            font-weight: 600; /* Bold */
+            background-color: #f9fafb; /* Tailwind gray-50 */
+        }
+        .grand-total-row td {
+             font-weight: 700; /* Bolder */
+             background-color: #e2e8f0; /* Tailwind gray-200 */
+             border-top: 2px solid #9ca3af; /* Gray-400 border */
+        }
+
 
         /* Print Styles */
         @media print {
             body {
-                background-color: #fff; /* White background for printing */
-                font-size: 10pt; /* Adjust font size for print */
+                background-color: #fff;
+                font-size: 9pt; /* Slightly smaller for potentially longer table */
             }
-            /* Hide elements not needed for printing */
-            #loan-form, #printButton, .message-box, h1:first-of-type {
-                display: none !important; /* Use !important to ensure hiding */
+            /* Hide form, buttons, messages, and charts for printing */
+            #loan-form, #printButton, .message-box, h1:first-of-type, #lineChartContainer { /* Removed #pieChartContainer */
+                display: none !important;
             }
-            /* Ensure results are visible and take full width */
             #results {
-                display: block !important; /* Override hidden class if present */
-                box-shadow: none;
-                border: none;
-                margin-top: 0;
-                padding: 0;
-                max-width: 100%;
+                display: block !important;
+                box-shadow: none; border: none; margin-top: 0; padding: 0; max-width: 100%;
             }
-             .max-w-4xl {
-                max-width: 100%;
-                padding: 0;
-                margin: 0;
-             }
-             .table-container {
-                max-height: none; /* Remove max height for printing */
-                overflow-y: visible;
-                border: none;
-                box-shadow: none;
-                margin-bottom: 0;
-             }
-            table {
-                width: 100%;
-                border-collapse: collapse;
-            }
+             .max-w-4xl { max-width: 100%; padding: 0; margin: 0; }
+             .table-container { max-height: none; overflow-y: visible; border: 1px solid #ddd; box-shadow: none; margin-bottom: 0; } /* Add border for print */
+            table { width: 100%; border-collapse: collapse; }
             thead th {
-                background-color: #e2e8f0 !important; /* Ensure header background prints */
-                -webkit-print-color-adjust: exact; /* Force background color printing in Chrome/Safari */
-                print-color-adjust: exact; /* Standard property */
-                 position: static; /* Remove sticky for print */
-            }
-            th, td {
-                border: 1px solid #ddd; /* Add borders for clarity */
-                padding: 6px; /* Adjust padding */
-            }
-            .summary-grid { /* Target the summary grid */
-                 grid-template-columns: repeat(3, minmax(0, 1fr)); /* Keep 3 columns */
-                 gap: 1rem;
-                 margin-bottom: 1rem;
-            }
-            .summary-item { /* Target summary items */
-                 background-color: #f3f4f6 !important; /* Light gray background */
-                 padding: 0.5rem;
-                 border-radius: 0;
-                 box-shadow: none;
+                background-color: #e2e8f0 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                 position: static;
                  border: 1px solid #ddd;
+            }
+            th, td { border: 1px solid #ddd; padding: 5px; } /* Adjust padding */
+            .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+            .summary-item {
+                 background-color: #f3f4f6 !important; padding: 0.5rem; border-radius: 0;
+                 box-shadow: none; border: 1px solid #ddd;
+                 -webkit-print-color-adjust: exact; print-color-adjust: exact;
+            }
+             h2 { text-align: center; font-size: 14pt; margin-bottom: 0.5rem; }
+             .chart-container { display: none !important; }
+             /* Ensure total rows print with background */
+             .year-total-row td, .grand-total-row td {
                  -webkit-print-color-adjust: exact;
                  print-color-adjust: exact;
-            }
-             h2 { /* Style headings for print */
-                 text-align: center;
-                 font-size: 14pt;
-                 margin-bottom: 0.5rem;
-            }
+             }
+             .year-total-row td { background-color: #f9fafb !important; }
+             .grand-total-row td { background-color: #e2e8f0 !important; }
         }
     </style>
 </head>
@@ -130,7 +123,7 @@
         <h1 class="text-2xl md:text-3xl font-bold text-center text-gray-800 mb-6">Loan Amortization Calculator</h1>
 
         <form id="loan-form" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
+             <div>
                 <label for="loanAmount" class="block text-sm font-medium text-gray-700 mb-1">Loan Amount ($)</label>
                 <input type="number" id="loanAmount" name="loanAmount" placeholder="e.g., 300000" required class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
             </div>
@@ -161,7 +154,7 @@
 
         <div id="results" class="hidden mt-8">
              <h2 class="text-xl md:text-2xl font-semibold text-gray-800 mb-4 text-center">Calculation Summary</h2>
-             <div class="summary-grid grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 text-center">
+             <div class="summary-grid grid grid-cols-1 sm:grid-cols-3 gap-4 mb-2 text-center">
                  <div class="summary-item bg-gray-100 p-4 rounded-md shadow-sm">
                      <p class="text-sm font-medium text-gray-600">Monthly Payment</p>
                      <p id="monthlyPaymentResult" class="text-lg font-bold text-indigo-700"></p>
@@ -174,6 +167,10 @@
                      <p class="text-sm font-medium text-gray-600">Total Interest Paid</p>
                      <p id="totalInterestResult" class="text-lg font-bold text-indigo-700"></p>
                  </div>
+             </div>
+
+             <div id="lineChartContainer" class="chart-container mb-6">
+                 <canvas id="interestPrincipalLineChart"></canvas>
              </div>
 
             <h2 class="text-xl md:text-2xl font-semibold text-gray-800 mb-4">Amortization Schedule</h2>
@@ -191,6 +188,9 @@
                     </thead>
                     <tbody id="schedule-body" class="bg-white divide-y divide-gray-200">
                         </tbody>
+                    <tfoot id="schedule-foot">
+
+                    </tfoot>
                 </table>
             </div>
              <div class="text-center mt-4">
@@ -206,38 +206,31 @@
         const form = document.getElementById('loan-form');
         const resultsDiv = document.getElementById('results');
         const scheduleBody = document.getElementById('schedule-body');
+        const scheduleFoot = document.getElementById('schedule-foot'); // Get tfoot element
         const monthlyPaymentResult = document.getElementById('monthlyPaymentResult');
         const totalPrincipalResult = document.getElementById('totalPrincipalResult');
         const totalInterestResult = document.getElementById('totalInterestResult');
         const messageBox = document.getElementById('messageBox');
-        const printButton = document.getElementById('printButton'); // Get print button
-        let messageTimeout = null; // Variable to hold the timeout ID
+        const printButton = document.getElementById('printButton');
+        // REMOVED pieChartCanvas
+        const lineChartCanvas = document.getElementById('interestPrincipalLineChart');
+        let messageTimeout = null;
+        // REMOVED paymentPieChart
+        let interestPrincipalLineChart = null;
 
         // Function to display messages
         function showMessage(message, isError = true, duration = 5000) {
-             // Clear any existing timeout to prevent premature hiding
-            if (messageTimeout) {
-                clearTimeout(messageTimeout);
-            }
-
+            if (messageTimeout) clearTimeout(messageTimeout);
             messageBox.textContent = message;
-            messageBox.style.backgroundColor = isError ? '#fecaca' : '#a7f3d0'; // Red-200 for error, Green-200 for success/info
-            messageBox.style.color = isError ? '#991b1b' : '#065f46'; // Red-800 for error, Green-800 for success/info
-            messageBox.style.borderColor = isError ? '#f87171' : '#6ee7b7'; // Red-400 for error, Green-300 for success/info
-            messageBox.style.opacity = '1'; // Ensure it's fully visible
+            messageBox.style.backgroundColor = isError ? '#fecaca' : '#a7f3d0';
+            messageBox.style.color = isError ? '#991b1b' : '#065f46';
+            messageBox.style.borderColor = isError ? '#f87171' : '#6ee7b7';
+            messageBox.style.opacity = '1';
             messageBox.style.display = 'block';
-
-            // Hide the message box after the specified duration
-            // Only set timeout if duration is positive
             if (duration > 0) {
-                 messageTimeout = setTimeout(() => {
-                    messageBox.style.opacity = '0'; // Start fade out
-                    // Wait for fade out transition to finish before hiding
-                    setTimeout(() => {
-                         if (messageBox.style.opacity === '0') { // Check if it wasn't shown again quickly
-                            messageBox.style.display = 'none';
-                         }
-                    }, 500); // Match transition duration in CSS (0.5s)
+                messageTimeout = setTimeout(() => {
+                    messageBox.style.opacity = '0';
+                    setTimeout(() => { if (messageBox.style.opacity === '0') messageBox.style.display = 'none'; }, 500);
                 }, duration);
             }
         }
@@ -245,131 +238,191 @@
         // Function to format currency
         function formatCurrency(amount) {
             const numAmount = Number(amount);
-            if (isNaN(numAmount)) {
-                return '$--.--';
-            }
+            if (isNaN(numAmount)) return '$--.--';
             return numAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
         }
 
         // Function to format date as MM/DD/YYYY
         function formatDate(date) {
-            if (!(date instanceof Date) || isNaN(date)) {
-                return '--/--/----';
-            }
+            if (!(date instanceof Date) || isNaN(date)) return '--/--/----';
             const month = (date.getMonth() + 1).toString().padStart(2, '0');
             const day = date.getDate().toString().padStart(2, '0');
             const year = date.getFullYear();
             return `${month}/${day}/${year}`;
         }
 
+        // --- Chart Functions ---
+
+        // REMOVED updatePieChart function
+
+        // Function to create or update the LINE chart
+        function updateLineChart(dates, principalData, interestData) {
+            if (interestPrincipalLineChart) interestPrincipalLineChart.destroy();
+            const ctx = lineChartCanvas.getContext('2d');
+            const dateObjects = dates.map(d => d instanceof Date ? d : new Date(d));
+
+            interestPrincipalLineChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                     labels: dateObjects,
+                     datasets: [
+                        {
+                            label: 'Principal Paid',
+                            data: principalData,
+                            borderColor: 'rgb(79, 70, 229)',
+                            backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                            fill: false,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Interest Paid',
+                            data: interestData,
+                            borderColor: 'rgb(245, 158, 11)',
+                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                            fill: false,
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: { unit: 'month', tooltipFormat: 'MMM yyyy', displayFormats: { month: 'MMM yyyy' } },
+                            title: { display: true, text: 'Payment Date' }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Amount ($)' },
+                            ticks: { callback: function(value) { return formatCurrency(value).replace('$', ''); } }
+                        }
+                    },
+                    interaction: { mode: 'nearest', axis: 'x', intersect: false }
+                }
+            });
+        }
+
+
+        // --- Event Listeners ---
 
         // Event listener for form submission
         form.addEventListener('submit', function(event) {
-            event.preventDefault(); // Prevent default form submission
+            event.preventDefault();
 
-            // Clear previous results and hide the results section
+            // Clear previous results
             scheduleBody.innerHTML = '';
+            scheduleFoot.innerHTML = ''; // Clear footer as well
             resultsDiv.classList.add('hidden');
-            messageBox.style.display = 'none'; // Hide any previous messages
-             if (messageTimeout) clearTimeout(messageTimeout); // Clear message timeout on new calculation
+            messageBox.style.display = 'none';
+            if (messageTimeout) clearTimeout(messageTimeout);
+            // Destroy existing charts
+            // REMOVED pie chart destruction
+            if (interestPrincipalLineChart) interestPrincipalLineChart.destroy();
 
             // Get input values
             const loanAmount = parseFloat(document.getElementById('loanAmount').value);
             const downPayment = parseFloat(document.getElementById('downPayment').value);
             const annualInterestRate = parseFloat(document.getElementById('interestRate').value);
             const loanTermYears = parseInt(document.getElementById('loanTerm').value);
-            const startDateValue = document.getElementById('startDate').value; // Get date string
+            const startDateValue = document.getElementById('startDate').value;
 
             // --- Input Validation ---
-            if (isNaN(loanAmount) || loanAmount <= 0) {
-                showMessage('Please enter a valid positive Loan Amount.'); return;
-            }
-            if (isNaN(downPayment) || downPayment < 0) {
-                showMessage('Please enter a valid Down Payment (0 or positive).'); return;
-            }
-             if (downPayment >= loanAmount) {
-                showMessage('Down Payment cannot be greater than or equal to the Loan Amount.'); return;
-            }
-            if (isNaN(annualInterestRate) || annualInterestRate < 0) {
-                showMessage('Please enter a valid non-negative Annual Interest Rate.'); return;
-            }
-            if (isNaN(loanTermYears) || loanTermYears <= 0) {
-                showMessage('Please enter a valid positive Loan Term in years.'); return;
-            }
-            // Validate Start Date Input
-            if (!startDateValue) {
-                 showMessage('Please select a First Payment Date.'); return;
-            }
-            const startDate = new Date(startDateValue + 'T00:00:00'); // Ensure parsing as local time
-            if (isNaN(startDate.getTime())) {
-                 showMessage('Please enter a valid First Payment Date.'); return;
-            }
-
+            if (isNaN(loanAmount) || loanAmount <= 0) { showMessage('Please enter a valid positive Loan Amount.'); return; }
+            if (isNaN(downPayment) || downPayment < 0) { showMessage('Please enter a valid Down Payment (0 or positive).'); return; }
+            if (downPayment >= loanAmount) { showMessage('Down Payment cannot be greater than or equal to the Loan Amount.'); return; }
+            if (isNaN(annualInterestRate) || annualInterestRate < 0) { showMessage('Please enter a valid non-negative Annual Interest Rate.'); return; }
+            if (isNaN(loanTermYears) || loanTermYears <= 0) { showMessage('Please enter a valid positive Loan Term in years.'); return; }
+            if (!startDateValue) { showMessage('Please select a First Payment Date.'); return; }
+            const startDate = new Date(startDateValue + 'T00:00:00');
+            if (isNaN(startDate.getTime())) { showMessage('Please enter a valid First Payment Date.'); return; }
 
             // --- Calculations ---
-            const principal = loanAmount - downPayment;
+            const principal = loanAmount - downPayment; // Grand total principal
             const monthlyInterestRate = annualInterestRate / 100 / 12;
             const numberOfPayments = loanTermYears * 12;
-
             let standardMonthlyPayment = 0;
 
-            // Calculate the standard monthly payment - handle 0% interest rate case
             if (monthlyInterestRate === 0) {
-                 standardMonthlyPayment = principal / numberOfPayments;
+                standardMonthlyPayment = principal / numberOfPayments;
             } else {
-                 const factor = Math.pow(1 + monthlyInterestRate, numberOfPayments);
-                 // Added check for factor - 1 being zero or very close to zero, which can happen with extremely low rates/long terms causing NaN/Infinity
-                 if (Math.abs(factor - 1) < 1e-10) {
-                     standardMonthlyPayment = principal / numberOfPayments; // Approximation for very low rates
-                 } else {
-                     standardMonthlyPayment = principal * (monthlyInterestRate * factor) / (factor - 1);
-                 }
+                const factor = Math.pow(1 + monthlyInterestRate, numberOfPayments);
+                if (Math.abs(factor - 1) < 1e-10) { standardMonthlyPayment = principal / numberOfPayments; }
+                else { standardMonthlyPayment = principal * (monthlyInterestRate * factor) / (factor - 1); }
             }
-             // Check if calculated payment is valid
-             if (isNaN(standardMonthlyPayment) || !isFinite(standardMonthlyPayment)) {
-                showMessage('Calculation resulted in an invalid monthly payment. Check inputs (e.g., very high interest rate).');
-                return;
+            if (isNaN(standardMonthlyPayment) || !isFinite(standardMonthlyPayment)) {
+                showMessage('Calculation resulted in an invalid monthly payment. Check inputs.'); return;
             }
 
-
-            // --- Generate Amortization Schedule ---
+            // --- Generate Amortization Schedule & Collect Chart Data ---
             let balance = principal;
-            let totalInterestPaid = 0; // Initialize total interest paid
+            let grandTotalInterestPaid = 0; // Grand total interest
+            const paymentDates = [];
+            const principalPayments = [];
+            const interestPayments = [];
+
+            let currentYear = -1; // Initialize year tracker
+            let yearPrincipalPaid = 0;
+            let yearInterestPaid = 0;
 
             for (let month = 1; month <= numberOfPayments; month++) {
                 const interestPayment = balance * monthlyInterestRate;
                 let principalPayment = standardMonthlyPayment - interestPayment;
-                let currentMonthlyPayment = standardMonthlyPayment; // Use the standard payment by default
+                let currentMonthlyPayment = standardMonthlyPayment;
 
-                // Adjust last payment precisely to ensure balance becomes exactly 0
-                // Check if it's the last month OR if the calculated principal payment exceeds the remaining balance
-                // OR if the remaining balance is very close to the principal payment (handles floating point issues)
                 if (month === numberOfPayments || principalPayment > balance || Math.abs(balance - principalPayment) < 0.005) {
-                    principalPayment = balance; // Pay off the exact remaining balance
-                    currentMonthlyPayment = principalPayment + interestPayment; // Recalculate this month's payment
+                    principalPayment = balance;
+                    currentMonthlyPayment = principalPayment + interestPayment;
                 }
-
                 balance -= principalPayment;
-                 // Handle potential floating point inaccuracies making balance slightly negative
-                 // Set balance to 0 if it's very close
-                if (Math.abs(balance) < 0.005) {
-                    balance = 0;
-                }
+                if (Math.abs(balance) < 0.005) balance = 0;
 
-                // Ensure non-negative values for display, although calculations should be correct
                 const displayInterest = Math.max(0, interestPayment);
                 const displayPrincipal = Math.max(0, principalPayment);
                 const displayPayment = Math.max(0, currentMonthlyPayment);
 
+                grandTotalInterestPaid += displayInterest; // Accumulate grand total interest
 
-                totalInterestPaid += displayInterest; // Accumulate the displayed (non-negative) interest
-
-                // Calculate payment date for the current month
+                // Calculate payment date
                 let paymentDateForMonth = new Date(startDate);
-                paymentDateForMonth.setMonth(startDate.getMonth() + month -1);
+                paymentDateForMonth.setMonth(startDate.getMonth() + month - 1);
+                const paymentYear = paymentDateForMonth.getFullYear();
 
+                // --- Yearly Total Logic ---
+                if (currentYear === -1) { // First payment initializes the year
+                    currentYear = paymentYear;
+                } else if (paymentYear !== currentYear) {
+                    // If year changed, add the total row for the PREVIOUS year
+                    const yearTotalRow = document.createElement('tr');
+                    yearTotalRow.classList.add('year-total-row'); // Add class for styling
+                    yearTotalRow.innerHTML = `
+                        <td colspan="3" class="px-4 py-2 text-left text-sm">Year ${currentYear} Total:</td>
+                        <td class="px-4 py-2 text-right text-sm">${formatCurrency(yearPrincipalPaid)}</td>
+                        <td class="px-4 py-2 text-right text-sm">${formatCurrency(yearInterestPaid)}</td>
+                        <td class="px-4 py-2 text-right text-sm"></td> `;
+                    scheduleBody.appendChild(yearTotalRow);
 
-                // Create table row
+                    // Reset yearly totals and update current year
+                    currentYear = paymentYear;
+                    yearPrincipalPaid = 0;
+                    yearInterestPaid = 0;
+                }
+
+                // Accumulate yearly totals
+                yearPrincipalPaid += displayPrincipal;
+                yearInterestPaid += displayInterest;
+
+                // Store data for line chart
+                paymentDates.push(paymentDateForMonth);
+                principalPayments.push(displayPrincipal);
+                interestPayments.push(displayInterest);
+
+                // Add regular payment row to table body
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 text-left">${month}</td>
@@ -381,52 +434,78 @@
                 `;
                 scheduleBody.appendChild(row);
 
-                 // If balance is zero or less, stop generating rows
+                // If it's the very last payment, add the final year's total row immediately
+                if (month === numberOfPayments) {
+                     const lastYearTotalRow = document.createElement('tr');
+                     lastYearTotalRow.classList.add('year-total-row');
+                     lastYearTotalRow.innerHTML = `
+                        <td colspan="3" class="px-4 py-2 text-left text-sm">Year ${currentYear} Total:</td>
+                        <td class="px-4 py-2 text-right text-sm">${formatCurrency(yearPrincipalPaid)}</td>
+                        <td class="px-4 py-2 text-right text-sm">${formatCurrency(yearInterestPaid)}</td>
+                        <td class="px-4 py-2 text-right text-sm"></td>
+                    `;
+                    scheduleBody.appendChild(lastYearTotalRow);
+                }
+
                 if (balance <= 0) {
-                    break;
+                     // If balance hit zero early, make sure the last year's total is added
+                     if (month < numberOfPayments) { // Check if we haven't already added it above
+                         const finalYearTotalRow = document.createElement('tr');
+                         finalYearTotalRow.classList.add('year-total-row');
+                         finalYearTotalRow.innerHTML = `
+                            <td colspan="3" class="px-4 py-2 text-left text-sm">Year ${currentYear} Total:</td>
+                            <td class="px-4 py-2 text-right text-sm">${formatCurrency(yearPrincipalPaid)}</td>
+                            <td class="px-4 py-2 text-right text-sm">${formatCurrency(yearInterestPaid)}</td>
+                            <td class="px-4 py-2 text-right text-sm"></td>
+                        `;
+                        scheduleBody.appendChild(finalYearTotalRow);
+                     }
+                     break; // Exit loop if balance is zero
                 }
             }
 
-            // --- Display Results ---
+             // --- Add Grand Total Row ---
+            const grandTotalRow = document.createElement('tr');
+            grandTotalRow.classList.add('grand-total-row'); // Add class for styling
+            grandTotalRow.innerHTML = `
+                <td colspan="3" class="px-4 py-2 text-left text-sm">Grand Totals:</td>
+                <td class="px-4 py-2 text-right text-sm">${formatCurrency(principal)}</td> <td class="px-4 py-2 text-right text-sm">${formatCurrency(grandTotalInterestPaid)}</td>
+                <td class="px-4 py-2 text-right text-sm"></td> `;
+            scheduleFoot.appendChild(grandTotalRow); // Add to tfoot
+
+
+            // --- Display Summary Results ---
             monthlyPaymentResult.textContent = formatCurrency(standardMonthlyPayment);
             totalPrincipalResult.textContent = formatCurrency(principal);
-            // *** Removed the problematic line that caused the ReferenceError ***
-            // Use the accumulated totalInterestPaid from the loop, which is correct
-            totalInterestResult.textContent = formatCurrency(totalInterestPaid);
+            totalInterestResult.textContent = formatCurrency(grandTotalInterestPaid);
 
-            resultsDiv.classList.remove('hidden'); // Show the results section
+            // --- Update Line Chart ---
+            // REMOVED pie chart update
+            updateLineChart(paymentDates, principalPayments, interestPayments);
+
+            resultsDiv.classList.remove('hidden'); // Show results section
         });
 
          // Event listener for print button
         printButton.addEventListener('click', function() {
-            // Show a confirmation message that the click was registered
-            showMessage('Attempting to open print dialog...', false, 2000); // Show info message for 2 seconds
-
-            // Use a small timeout to allow the message to display before potential blocking by print dialog
+            showMessage('Attempting to open print dialog...', false, 2000);
             setTimeout(() => {
-                 try {
-                    window.print();
-                 } catch (error) {
+                 try { window.print(); }
+                 catch (error) {
                      console.error("Print error:", error);
-                     showMessage('Could not open print dialog. Check browser console for errors.', true);
+                     showMessage('Could not open print dialog. Check browser console.', true);
                  }
-            }, 100); // 100ms delay
+            }, 100);
         });
 
-        // Set default start date to today for convenience
+        // Set default start date to today
         document.addEventListener('DOMContentLoaded', (event) => {
             const today = new Date();
             const yyyy = today.getFullYear();
-            const mm = String(today.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
             const dd = String(today.getDate()).padStart(2, '0');
-            try {
-                 // Set the default value for the date input
-                 document.getElementById('startDate').value = `${yyyy}-${mm}-${dd}`;
-            } catch (e) {
-                // Log error if the element is not found (should not happen in this structure)
-                console.error("Could not set default date:", e)
-            }
-
+            try { document.getElementById('startDate').value = `${yyyy}-${mm}-${dd}`; }
+            catch (e) { console.error("Could not set default date:", e); }
         });
 
     </script>
