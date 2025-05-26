@@ -136,8 +136,8 @@
                 <input type="number" id="interestRate" name="interestRate" step="0.01" placeholder="e.g., 5.5" required class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
             </div>
             <div>
-                <label for="loanTerm" class="block text-sm font-medium text-gray-700 mb-1">Loan Term (Years)</label>
-                <input type="number" id="loanTerm" name="loanTerm" placeholder="e.g., 30" required class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                <label for="loanTermMonths" class="block text-sm font-medium text-gray-700 mb-1">Loan Term (Months)</label>
+                <input type="number" id="loanTermMonths" name="loanTermMonths" placeholder="e.g., 360" required class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
             </div>
              <div class="md:col-span-2">
                 <label for="startDate" class="block text-sm font-medium text-gray-700 mb-1">First Payment Date</label>
@@ -294,7 +294,7 @@
                     scales: {
                         x: {
                             type: 'time',
-                            time: { unit: 'month', tooltipFormat: 'MMM yyyy', displayFormats: { month: 'MMM yyyy' } },
+                            time: { unit: 'month', tooltipFormat: 'MMM finalList', displayFormats: { month: 'MMM finalList' } },
                             title: { display: true, text: 'Payment Date' }
                         },
                         y: {
@@ -329,7 +329,8 @@
             const loanAmount = parseFloat(document.getElementById('loanAmount').value);
             const downPayment = parseFloat(document.getElementById('downPayment').value);
             const annualInterestRate = parseFloat(document.getElementById('interestRate').value);
-            const loanTermYears = parseInt(document.getElementById('loanTerm').value);
+            // UPDATED to get loan term in months
+            const loanTermMonths = parseInt(document.getElementById('loanTermMonths').value);
             const startDateValue = document.getElementById('startDate').value;
 
             // --- Input Validation ---
@@ -337,7 +338,8 @@
             if (isNaN(downPayment) || downPayment < 0) { showMessage('Please enter a valid Down Payment (0 or positive).'); return; }
             if (downPayment >= loanAmount) { showMessage('Down Payment cannot be greater than or equal to the Loan Amount.'); return; }
             if (isNaN(annualInterestRate) || annualInterestRate < 0) { showMessage('Please enter a valid non-negative Annual Interest Rate.'); return; }
-            if (isNaN(loanTermYears) || loanTermYears <= 0) { showMessage('Please enter a valid positive Loan Term in years.'); return; }
+            // UPDATED validation message for loan term in months
+            if (isNaN(loanTermMonths) || loanTermMonths <= 0) { showMessage('Please enter a valid positive Loan Term in months.'); return; }
             if (!startDateValue) { showMessage('Please select a First Payment Date.'); return; }
             const startDate = new Date(startDateValue + 'T00:00:00');
             if (isNaN(startDate.getTime())) { showMessage('Please enter a valid First Payment Date.'); return; }
@@ -345,7 +347,8 @@
             // --- Calculations ---
             const principal = loanAmount - downPayment; // Grand total principal
             const monthlyInterestRate = annualInterestRate / 100 / 12;
-            const numberOfPayments = loanTermYears * 12;
+            // UPDATED: numberOfPayments is now directly loanTermMonths
+            const numberOfPayments = loanTermMonths;
             let standardMonthlyPayment = 0;
 
             if (monthlyInterestRate === 0) {
@@ -355,8 +358,8 @@
                 if (Math.abs(factor - 1) < 1e-10) { standardMonthlyPayment = principal / numberOfPayments; }
                 else { standardMonthlyPayment = principal * (monthlyInterestRate * factor) / (factor - 1); }
             }
-            if (isNaN(standardMonthlyPayment) || !isFinite(standardMonthlyPayment)) {
-                showMessage('Calculation resulted in an invalid monthly payment. Check inputs.'); return;
+            if (isNaN(standardMonthlyPayment) || !isFinite(standardMonthlyPayment) || standardMonthlyPayment <=0) { // Added check for non-positive payment
+                showMessage('Calculation resulted in an invalid or non-positive monthly payment. Check inputs (e.g., very low loan amount/term or high interest rate).'); return;
             }
 
             // --- Generate Amortization Schedule & Collect Chart Data ---
@@ -375,16 +378,24 @@
                 let principalPayment = standardMonthlyPayment - interestPayment;
                 let currentMonthlyPayment = standardMonthlyPayment;
 
-                if (month === numberOfPayments || principalPayment > balance || Math.abs(balance - principalPayment) < 0.005) {
-                    principalPayment = balance;
-                    currentMonthlyPayment = principalPayment + interestPayment;
+                // Ensure principal payment doesn't make interest negative or exceed balance significantly
+                if (principalPayment < 0 && monthlyInterestRate > 0) { // Interest only loan or error
+                     principalPayment = 0; // Or handle as error
                 }
+
+
+                if (month === numberOfPayments || principalPayment > balance || Math.abs(balance - principalPayment) < 0.005) {
+                    principalPayment = balance; // Pay off the exact remaining balance
+                    currentMonthlyPayment = principalPayment + interestPayment; // Recalculate this month's payment
+                }
+
                 balance -= principalPayment;
-                if (Math.abs(balance) < 0.005) balance = 0;
+                if (Math.abs(balance) < 0.005) balance = 0; // Correct floating point inaccuracies
 
                 const displayInterest = Math.max(0, interestPayment);
                 const displayPrincipal = Math.max(0, principalPayment);
                 const displayPayment = Math.max(0, currentMonthlyPayment);
+
 
                 grandTotalInterestPaid += displayInterest; // Accumulate grand total interest
 
@@ -447,20 +458,19 @@
                     scheduleBody.appendChild(lastYearTotalRow);
                 }
 
-                if (balance <= 0) {
+                if (balance <= 0 && month < numberOfPayments) { // Added check month < numberOfPayments
                      // If balance hit zero early, make sure the last year's total is added
-                     if (month < numberOfPayments) { // Check if we haven't already added it above
-                         const finalYearTotalRow = document.createElement('tr');
-                         finalYearTotalRow.classList.add('year-total-row');
-                         finalYearTotalRow.innerHTML = `
-                            <td colspan="3" class="px-4 py-2 text-left text-sm">Year ${currentYear} Total:</td>
-                            <td class="px-4 py-2 text-right text-sm">${formatCurrency(yearPrincipalPaid)}</td>
-                            <td class="px-4 py-2 text-right text-sm">${formatCurrency(yearInterestPaid)}</td>
-                            <td class="px-4 py-2 text-right text-sm"></td>
-                        `;
-                        scheduleBody.appendChild(finalYearTotalRow);
-                     }
-                     break; // Exit loop if balance is zero
+                     // And it wasn't already added by the (month === numberOfPayments) condition
+                     const finalYearTotalRow = document.createElement('tr');
+                     finalYearTotalRow.classList.add('year-total-row');
+                     finalYearTotalRow.innerHTML = `
+                        <td colspan="3" class="px-4 py-2 text-left text-sm">Year ${currentYear} Total:</td>
+                        <td class="px-4 py-2 text-right text-sm">${formatCurrency(yearPrincipalPaid)}</td>
+                        <td class="px-4 py-2 text-right text-sm">${formatCurrency(yearInterestPaid)}</td>
+                        <td class="px-4 py-2 text-right text-sm"></td>
+                    `;
+                    scheduleBody.appendChild(finalYearTotalRow);
+                    break; // Exit loop if balance is zero
                 }
             }
 
